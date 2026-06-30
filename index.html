@@ -173,6 +173,16 @@ html,body{height:100%;background:var(--bg);font-family:var(--font);color:var(--i
 #modal-wrap.open{display:flex}
 #gasto-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:800;align-items:flex-end}
 #gasto-modal.open{display:flex}
+#ticket-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:800;align-items:flex-end}
+#ticket-modal.open{display:flex}
+.ticket-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--sep)}
+.ticket-item:last-child{border-bottom:none}
+.ticket-item-check{width:22px;height:22px;border-radius:50%;border:2px solid var(--sep);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;transition:all .15s ease}
+.ticket-item-check.on{background:var(--accent2);border-color:var(--accent2)}
+.ticket-item-fields{flex:1;display:flex;flex-direction:column;gap:2px}
+.ticket-item-desc{border:none;background:none;font-size:14px;font-weight:500;color:var(--ink);font-family:var(--font);padding:0;width:100%}
+.ticket-item-cat{border:none;background:none;font-size:12px;color:var(--accent);font-family:var(--font);padding:0;font-weight:600}
+.ticket-item-monto{border:none;background:none;font-size:15px;font-weight:700;color:var(--ink);font-family:var(--font);text-align:right;width:90px;flex-shrink:0}
 #edit-perfil-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:800;align-items:flex-end}
 #edit-perfil-modal.open{display:flex}
 #limite-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:800;align-items:flex-end}
@@ -512,6 +522,8 @@ html,body{height:100%;background:var(--bg);font-family:var(--font);color:var(--i
 
 </div><!-- /app -->
 
+<button class="fab" id="scan-btn" style="bottom:158px;background:var(--accent2);box-shadow:0 4px 20px rgba(52,199,89,.4);font-size:22px;" onclick="document.getElementById('ticket-input').click()">📷</button>
+<input type="file" id="ticket-input" accept="image/*" capture="environment" style="display:none" onchange="onTicketSelected(event)"/>
 <button class="fab" id="fab-btn" onclick="openGastoModal()">+</button>
 <div id="toast"></div>
 
@@ -557,6 +569,33 @@ html,body{height:100%;background:var(--bg);font-family:var(--font);color:var(--i
     <div class="cat-grid" id="cat-grid"></div>
     <button class="btn-primary" id="save-gasto-btn" onclick="saveGasto()">Registrar</button>
     <button class="btn-secondary" onclick="closeGastoModal()">Cancelar</button>
+  </div>
+</div>
+
+<div id="ticket-modal" onclick="if(event.target===this&&!ticketLoading)closeTicketModal()">
+  <div class="modal" style="max-height:85vh;overflow-y:auto;">
+    <div class="modal-handle"></div>
+    <div id="ticket-loading" style="display:none;padding:50px 16px;text-align:center;">
+      <div style="font-size:40px;margin-bottom:14px;">🔎</div>
+      <div style="font-size:16px;font-weight:600;color:var(--ink);margin-bottom:6px;">Leyendo el ticket...</div>
+      <div style="font-size:13px;color:var(--ink4);">Puede tardar unos segundos</div>
+    </div>
+    <div id="ticket-error" style="display:none;padding:40px 16px;text-align:center;">
+      <div style="font-size:40px;margin-bottom:14px;">😕</div>
+      <div style="font-size:15px;font-weight:600;color:var(--ink);margin-bottom:6px;">No pudimos leer el ticket</div>
+      <div style="font-size:13px;color:var(--ink4);margin-bottom:18px;">Probá con una foto más clara, bien iluminada y derecha.</div>
+      <button class="btn-secondary" onclick="closeTicketModal()">Cerrar</button>
+    </div>
+    <div id="ticket-review" style="display:none;">
+      <div class="modal-title">Revisá lo que detectamos</div>
+      <div style="padding:0 16px 12px;font-size:13px;color:var(--ink4);" id="ticket-comercio">Tocá cada ítem para editarlo. Desmarcá lo que no quieras registrar.</div>
+      <div id="ticket-items-list" style="margin:0 16px 14px;"></div>
+      <div style="padding:0 16px 14px;display:flex;justify-content:space-between;font-size:14px;font-weight:600;color:var(--ink3);">
+        <span>Total a registrar</span><span id="ticket-total">$0</span>
+      </div>
+      <button class="btn-primary" onclick="confirmarTicket()">Registrar gastos seleccionados</button>
+      <button class="btn-secondary" onclick="closeTicketModal()">Cancelar</button>
+    </div>
   </div>
 </div>
 
@@ -674,7 +713,7 @@ sb.auth.onAuthStateChange((event, session) => {
     document.getElementById('auth-screen').style.display='none';
     document.getElementById('onboarding').style.display='none';
     document.getElementById('screens').style.display='none';
-    document.getElementById('fab-btn').style.display='none';
+    document.getElementById('fab-btn').style.display='none';document.getElementById('scan-btn').style.display='none';
     document.getElementById('reset-pass-screen').style.display='flex';
   }
 });
@@ -877,7 +916,7 @@ async function finishOnboarding(){
   S.logros[0].ok=true;S.xp+=100;S.misC++;
   document.getElementById('onboarding').style.display='none';
   document.getElementById('screens').style.display='flex';
-  document.getElementById('fab-btn').style.display='flex';
+  document.getElementById('fab-btn').style.display='flex';document.getElementById('scan-btn').style.display='flex';
   await saveProfile();
   initApp();
   showToast('¡Bienvenido/a, '+S.user.nombre.split(' ')[0]+'! 🧭 +100 XP');
@@ -899,7 +938,7 @@ async function checkSessionAndLoad(){
   if (loaded) {
     document.getElementById('onboarding').style.display='none';
     document.getElementById('screens').style.display='flex';
-    document.getElementById('fab-btn').style.display='flex';
+    document.getElementById('fab-btn').style.display='flex';document.getElementById('scan-btn').style.display='flex';
   } else {
     document.getElementById('onboarding').style.display='flex';
   }
@@ -963,7 +1002,7 @@ async function authSignOut(){
   S.deudas=[];S.gastos=[];S.limites={};
   document.getElementById('screens').style.display='none';
   document.getElementById('onboarding').style.display='none';
-  document.getElementById('fab-btn').style.display='none';
+  document.getElementById('fab-btn').style.display='none';document.getElementById('scan-btn').style.display='none';
   document.getElementById('auth-email').value='';
   document.getElementById('auth-pass').value='';
   authMode='login';
@@ -1163,6 +1202,76 @@ function openGastoModal(gasto){
 }
 function closeGastoModal(){document.getElementById('gasto-modal').classList.remove('open');}
 function openIngresoModal(){openGastoModal();setTipoMov('ingreso');}
+
+let ticketLoading=false,ticketItems=[];
+function fileToBase64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
+async function onTicketSelected(event){
+  const file=event.target.files[0];
+  if(!file)return;
+  event.target.value='';
+  document.getElementById('ticket-modal').classList.add('open');
+  document.getElementById('ticket-review').style.display='none';
+  document.getElementById('ticket-error').style.display='none';
+  document.getElementById('ticket-loading').style.display='block';
+  ticketLoading=true;
+  try{
+    const base64=await fileToBase64(file);
+    const mediaType=file.type||'image/jpeg';
+    const sys=`Sos un sistema que extrae datos de tickets/facturas de compra argentinos a partir de una foto. Te paso una imagen de un ticket. Devolvé SOLO un JSON válido, sin texto adicional, sin markdown, con esta forma exacta:
+{"comercio":"nombre del comercio si se lee, o null","items":[{"desc":"nombre del producto","monto":1234,"categoria":"una de: Comida, Transporte, Hogar, Salud, Ocio, Educación, Ropa, Otro"}]}
+Reglas: los montos son números enteros en pesos argentinos, sin puntos ni comas. Si no podés leer un precio, no incluyas ese ítem. Si el ticket es ilegible o no es un ticket de compra, devolvé {"comercio":null,"items":[]}. Categorizá cada producto lo mejor que puedas según su nombre (ej: verduras/carne/lácteos → Comida; nafta/sube → Transporte; remedios → Salud).`;
+    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      model:'claude-sonnet-4-6',max_tokens:1500,system:sys,
+      messages:[{role:'user',content:[
+        {type:'image',source:{type:'base64',media_type:mediaType,data:base64}},
+        {type:'text',text:'Extraé los ítems de este ticket.'}
+      ]}]
+    })});
+    const data=await res.json();
+    if(!res.ok||data.error)throw new Error('api error');
+    let raw=data.content?.[0]?.text||'';
+    raw=raw.trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'');
+    const parsed=JSON.parse(raw);
+    if(!parsed.items||parsed.items.length===0)throw new Error('sin items');
+    ticketItems=parsed.items.map(it=>({desc:it.desc||'Producto',monto:Math.round(it.monto)||0,cat:CATS.find(c=>c.n===it.categoria)?it.categoria:'Otro',on:true}));
+    document.getElementById('ticket-comercio').textContent=parsed.comercio?`Detectamos ${ticketItems.length} ítems de "${parsed.comercio}". Revisalos antes de guardar.`:`Detectamos ${ticketItems.length} ítems. Revisalos antes de guardar.`;
+    renderTicketItems();
+    document.getElementById('ticket-loading').style.display='none';
+    document.getElementById('ticket-review').style.display='block';
+  }catch(e){
+    document.getElementById('ticket-loading').style.display='none';
+    document.getElementById('ticket-error').style.display='block';
+  }
+  ticketLoading=false;
+}
+function renderTicketItems(){
+  const list=document.getElementById('ticket-items-list');
+  list.innerHTML=ticketItems.map((it,i)=>{
+    const catOpts=CATS.map(c=>`<option value="${c.n}" ${c.n===it.cat?'selected':''}>${c.em} ${c.n}</option>`).join('');
+    return`<div class="ticket-item"><div class="ticket-item-check ${it.on?'on':''}" onclick="toggleTicketItem(${i})">${it.on?'✓':''}</div><div class="ticket-item-fields"><input class="ticket-item-desc" value="${it.desc.replace(/"/g,'&quot;')}" oninput="ticketItems[${i}].desc=this.value"/><select class="ticket-item-cat" onchange="ticketItems[${i}].cat=this.value">${catOpts}</select></div><input class="ticket-item-monto" type="text" inputmode="numeric" value="${it.monto.toLocaleString('es-AR')}" oninput="formatMiles(this);ticketItems[${i}].monto=numValFromString(this.value);recalcTicketTotal()"/></div>`;
+  }).join('');
+  recalcTicketTotal();
+}
+function numValFromString(s){return parseInt(String(s).replace(/\D/g,''))||0;}
+function toggleTicketItem(i){ticketItems[i].on=!ticketItems[i].on;renderTicketItems();}
+function recalcTicketTotal(){const total=ticketItems.filter(it=>it.on).reduce((a,it)=>a+it.monto,0);document.getElementById('ticket-total').textContent='$'+total.toLocaleString('es-AR');}
+function closeTicketModal(){document.getElementById('ticket-modal').classList.remove('open');ticketItems=[];}
+async function confirmarTicket(){
+  const seleccionados=ticketItems.filter(it=>it.on&&it.monto>0);
+  if(seleccionados.length===0){showToast('Seleccioná al menos un ítem');return;}
+  for(const it of seleccionados){
+    const cat=CATS.find(c=>c.n===it.cat)||CATS[7];
+    const gasto={m:it.monto,desc:it.desc,cat:cat.n,em:cat.em,ts:Date.now(),tipo:'gasto'};
+    S.gastos.push(gasto);
+    const saved=await saveGastoDB(gasto);
+    if(saved&&saved.id)gasto.id=saved.id;
+  }
+  S.xp+=15*seleccionados.length;
+  await saveProfile();
+  renderNivel();renderDashboard();renderPresupuesto();
+  closeTicketModal();
+  showToast(`✓ ${seleccionados.length} gastos registrados del ticket`);
+}
 let epCobroTipoVal='fijo',epSacVal=true,epSitVal='';
 function openEditPerfil(){
   document.getElementById('ep-nombre').value=S.user.nombre;
